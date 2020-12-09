@@ -19,27 +19,6 @@ def parse_data(filename) -> List[str]:
 	return data
 
 
-def perform_modified_instruction(instruction, idx):
-	acc = 0
-	modified = False
-	if instruction['op'] == 'nop':
-		modified = True
-		if instruction['sign'] == '+':
-			return idx + instruction['count'], acc, modified
-		else:
-			return idx - instruction['count'], acc, modified
-
-	if instruction['op'] == 'jmp':
-		modified = True
-
-	if instruction['op'] == 'acc':
-		acc = instruction['count']
-		if instruction['sign'] == '-':
-			acc *= -1
-
-	return idx + 1, acc, modified
-
-
 def perform_instruction(instruction, idx):
 	acc = 0
 	if instruction['op'] == 'jmp':
@@ -59,19 +38,25 @@ def perform_instruction(instruction, idx):
 def run_program(data, visited, modified, idx, acc):
 	while idx < len(visited) and visited[idx] is False:
 		visited[idx] = True
-		if modified is False:  # If we haven't modified an instruction yet, try to modify it
-			new_idx, add_acc, modified_instruction = perform_modified_instruction(data[idx], idx)
-			if modified_instruction is True:  # If it was modified
-				new_visited = visited.copy()  # Make a copy of the visited commands so we can unwind
-				ret = run_program(data, new_visited, True, new_idx, acc)  # And run the program from here
-				if ret > 0:  # We found the right path, return up the tree
-					return ret
-				else:  # Otherwise we need to perform the correct instruction and try again
-					idx, add_acc = perform_instruction(data[idx], idx)
-			else:
-				idx = new_idx
-		else:
-			idx, add_acc = perform_instruction(data[idx], idx)
+
+		# If we haven't modified an instruction yet
+		if modified is False and data[idx]['op'] in ('jmp', 'nop'):
+			instruction = {
+				'count': data[idx]['count'],
+				'sign': data[idx]['sign'],
+				'op': 'jmp' if data[idx]['op'] == 'nop' else 'nop'
+			}
+			# Perform the modified instruction
+			new_idx, add_acc = perform_instruction(instruction, idx)
+
+			# And run the program from here
+			ret = run_program(data, visited.copy(), True, new_idx, acc)
+			if ret > 0:  # We found the right path, return up the tree
+				return ret
+
+		# We either need to not modify the instruction, or the modifying the instruction failed
+		# so perform the instruction normally
+		idx, add_acc = perform_instruction(data[idx], idx)
 		acc += add_acc
 
 	if idx == len(visited):
